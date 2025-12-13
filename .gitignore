@@ -1,0 +1,14 @@
+# Ignora executabilele
+ntt_final
+ntt_integration
+ntt_test
+*.exe
+*.out
+
+# Ignora fisiere temporare de compilare
+*.o
+*.obj
+
+# VS Code settings (optional, de obicei nu se urca)
+.vscode/
+
