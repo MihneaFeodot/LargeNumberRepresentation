@@ -1,5 +1,5 @@
 #include "bigint.cuh"
-#include <cstdio>    // ADAUGĂ ASTA
+#include <cstdio>
 #include <cstring>
 
 BigInt::BigInt(size_t n_limbs, bool negative)
@@ -39,13 +39,13 @@ void BigIntCUDA::free_bigint(BigInt* num) {
 
 void BigIntCUDA::copy_to_device(BigInt* dst, const BigInt* src) {
     CUDA_CHECK(cudaMemcpy(dst->limbs, src->limbs, 
-                         src->num_limbs * sizeof(limb_t), cudaMemcpyHostToDevice));
+                          src->num_limbs * sizeof(limb_t), cudaMemcpyHostToDevice));
     dst->is_negative = src->is_negative;
 }
 
 void BigIntCUDA::copy_to_host(BigInt* dst, const BigInt* src) {
     CUDA_CHECK(cudaMemcpy(dst->limbs, src->limbs,
-                         src->num_limbs * sizeof(limb_t), cudaMemcpyDeviceToHost));
+                          src->num_limbs * sizeof(limb_t), cudaMemcpyDeviceToHost));
     dst->is_negative = src->is_negative;
 }
 

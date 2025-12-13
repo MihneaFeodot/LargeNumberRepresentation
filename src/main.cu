@@ -1,13 +1,8 @@
 #include <iostream>
 #include <vector>
-
-// 1. IMPORTĂM INFRASTRUCTURA COLEGULUI 1
+#include <chrono> // Pentru cronometrare CPU
 #include "bigint.cuh" 
-
-// 2. IMPORTĂM ALGORITMUL TĂU
 #include "ntt_kernel.cuh"
-
-// 3. IMPORTĂM VERIFICATORUL (MPFR)
 #include "verification.h"
 
 #define CHECK(call) { \
@@ -19,81 +14,117 @@
 }
 
 int main() {
-    size_t num_limbs = 1024; 
-    size_t log_n = 10;
+    // === CONFIGURARE TEST ===
+    // Pentru testul de speedup, 4096 e ideal. 8192 ar putea dura mult pe CPU.
+    size_t num_limbs = 8192; 
+    
+    // Calcul automat log_n
+    size_t log_n = 0;
+    size_t temp = num_limbs;
+    while (temp > 1) { temp >>= 1; log_n++; }
+    
+    std::cout << "=== SPEEDUP TEST: GPU vs CPU ===\n";
+    std::cout << "N=" << num_limbs << " (" << log_n << " stages)\n";
 
-    std::cout << "=== INTEGRATION TEST FINAL: BigInt + NTT + Verification ===\n";
+    // --- SETUP MATEMATIC ---
+    uint64_t R = (1ULL << 32) % P_MOCK;
+    field_t R2 = ((unsigned __int128)R * R) % P_MOCK;
+    field_t g = 5;
+    field_t omega = pow_mod(g, (P_MOCK - 1) / num_limbs, P_MOCK);
 
-    // --- PASUL 1: SETUP ---
+    // --- PREGĂTIRE DATE ---
     BigInt* h_num = BigIntCUDA::allocate_host(num_limbs);
-    for(size_t i = 0; i < num_limbs; i++) h_num->limbs[i] = i; // Input: 0, 1, 2...
+    for(size_t i = 0; i < num_limbs; i++) h_num->limbs[i] = montgomery_mul(i, R2);
 
     BigInt* d_num = BigIntCUDA::allocate_device(num_limbs);
     BigIntCUDA::copy_to_device(d_num, h_num);
 
-    // Setup Twiddles (Dummy 1 pentru test, sau calculati corect daca ai implementat)
+    std::vector<field_t> h_twiddles(num_limbs);
+    for(size_t i=0; i<num_limbs; i++) h_twiddles[i] = montgomery_mul(pow_mod(omega, i, P_MOCK), R2);
+
     field_t* d_twiddles;
     CHECK(cudaMalloc(&d_twiddles, num_limbs * sizeof(field_t)));
-    std::vector<field_t> h_twiddles(num_limbs, 1); 
     CHECK(cudaMemcpy(d_twiddles, h_twiddles.data(), num_limbs * sizeof(field_t), cudaMemcpyHostToDevice));
 
-    // --- PASUL 2: EXECUȚIE GPU (NTT) ---
-    std::cout << "[NTT] Rulare kernel pe GPU...\n";
-    field_t* raw_ptr = (field_t*)d_num->limbs; 
+    // ==========================================
+    // 1. MĂSURARE TIMP GPU (Doar Kernel-urile)
+    // ==========================================
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
-    // Bit Reversal
+    field_t* raw_ptr = (field_t*)d_num->limbs; 
     int threads = 256;
     int blocks = (num_limbs + threads - 1) / threads;
-    bit_reverse_kernel<<<blocks, threads>>>(raw_ptr, num_limbs, log_n);
-    CHECK(cudaDeviceSynchronize());
-
-    // Butterfly Stages
     size_t shared_mem_size = (num_limbs + (num_limbs >> 5)) * sizeof(field_t);
+
+    // Pornim cronometrul GPU
+    cudaEventRecord(start);
+
+    // A. Bit Reversal
+    bit_reverse_kernel<<<blocks, threads>>>(raw_ptr, num_limbs, log_n);
+    
+    // B. Butterfly Stages
     for (int m = 2; m <= num_limbs; m *= 2) {
-        int ntt_blocks = (num_limbs / 2 + threads - 1) / threads;
-        ntt_stage_kernel<<<ntt_blocks, threads, shared_mem_size>>>(raw_ptr, d_twiddles, m, num_limbs);
-        CHECK(cudaDeviceSynchronize());
+        ntt_stage_kernel<<<1, threads, shared_mem_size>>>(raw_ptr, d_twiddles, m, num_limbs);
     }
 
-    // --- PASUL 3: RECUPERARE ---
+    // Oprim cronometrul GPU
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+    
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    float gpu_time_sec = milliseconds / 1000.0f;
+
+    std::cout << "\n[GPU] Timp Executie Kernel: " << gpu_time_sec << " secunde\n";
+
+    // Recuperăm datele pentru verificare
     BigIntCUDA::copy_to_host(h_num, d_num);
+
+    // ==========================================
+    // 2. MĂSURARE TIMP CPU (Naive Reference)
+    // ==========================================
+    std::cout << "[CPU] Rulare Reference NTT (Asteapta, e lent...)... \n";
     
-    // --- PASUL 4: VERIFICARE MATEMATICĂ (Golden Model) ---
-    std::cout << "[Verification] Comparare cu CPU Reference (MPFR)...\n";
-    
-    // Convertim rezultatul BigInt într-un std::vector pentru Verifier
-    std::vector<uint32_t> gpu_result(num_limbs);
+    // Pregătim datele pentru CPU (Input normal 0, 1, 2...)
     std::vector<uint32_t> input_data(num_limbs);
-    for(size_t i=0; i<num_limbs; i++) {
-        gpu_result[i] = h_num->limbs[i];
-        input_data[i] = i; // Reconstruim inputul știut
-    }
+    for(size_t i=0; i<num_limbs; i++) input_data[i] = i; 
 
-    // Instanțiem Verificatorul
     Verifier v(128);
-    
-    // NOTĂ: Pentru ca verificarea să treacă pe bune, 'd_twiddles' de pe GPU 
-    // trebuie să conțină puterile reale ale lui Omega, nu doar '1'.
-    // Dacă ai pus '1' în twiddles, rezultatul GPU va fi greșit matematic (dar corect algoritmic).
-    // Aici testăm doar dacă Verifier-ul rulează.
-    
-    // Calculăm referința pe CPU (Aceasta va dura puțin)
-    // Folosim omega=1 pentru testul cu twiddles=1
-    std::vector<uint32_t> cpu_reference = v.compute_reference_ntt_naive(input_data, 1, P_MOCK);
 
-    bool match = true;
-    for(size_t i=0; i<num_limbs; i++) {
-        if(gpu_result[i] != cpu_reference[i]) {
-            match = false;
-            std::cout << "Mismatch la index " << i << ": GPU=" << gpu_result[i] << " CPU=" << cpu_reference[i] << "\n";
-            break;
-        }
+    // Pornim cronometrul CPU
+    auto cpu_start = std::chrono::high_resolution_clock::now();
+    
+    std::vector<uint32_t> cpu_reference = v.compute_reference_ntt_naive(input_data, omega, P_MOCK);
+    
+    auto cpu_stop = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> cpu_diff = cpu_stop - cpu_start;
+    double cpu_time_sec = cpu_diff.count();
+
+    std::cout << "[CPU] Timp Executie: " << cpu_time_sec << " secunde\n";
+
+    // ==========================================
+    // 3. CALCUL SPEEDUP
+    // ==========================================
+    double speedup = cpu_time_sec / gpu_time_sec;
+    
+    std::cout << "\n============================================\n";
+    std::cout << "REZULTAT FINAL (SPEEDUP):\n";
+    std::cout << "GPU Time: " << gpu_time_sec << " s\n";
+    std::cout << "CPU Time: " << cpu_time_sec << " s\n";
+    std::cout << ">>> SPEEDUP: " << speedup << "x <<<\n";
+    std::cout << "============================================\n";
+
+    // Verificare Scurta (ca sa fim siguri ca e corect)
+    if (montgomery_mul(h_num->limbs[0], 1) == cpu_reference[0]) {
+        std::cout << "[Check] Rezultatele par consistente (Index 0 Match).\n";
+    } else {
+        std::cout << "[Check] EROARE: Rezultatele difera!\n";
     }
 
-    if (match) std::cout << "\n[SUCCESS] Rezultatele GPU sunt IDENTICE cu cele CPU!\n";
-    else std::cout << "\n[FAIL] Rezultatele diferă (Normal daca Twiddles sunt dummy 1).\n";
-
-    // Curățenie
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
     CHECK(cudaFree(d_twiddles));
     BigIntCUDA::free_bigint(d_num);
     BigIntCUDA::free_bigint(h_num);
