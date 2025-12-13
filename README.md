@@ -2,7 +2,7 @@
 
 ## Aritmetica Numerelor Mari (BigInt) și Transformata Numerică Teoretică (NTT) pe CUDA
 
-Acest proiect implementează o **bibliotecă de aritmetică BigInt de înaltă performanță**, optimizată pentru **GPU-uri NVIDIA CUDA**, având ca obiectiv principal **înmulțirea rapidă a numerelor mari și a polinoamelor** folosind **Transformata Numerică Teoretică (NTT)** în complexitate (O(N \log N)).
+Acest proiect implementează o **bibliotecă de aritmetică BigInt de înaltă performanță**, optimizată pentru **GPU-uri NVIDIA CUDA**, având ca obiectiv principal **înmulțirea rapidă a numerelor mari și a polinoamelor** folosind **Transformata Numerică Teoretică (NTT)** în complexitate ( $O(N \log N)$ ).
 
 Scopul este demonstrarea unui **speedup de 5x–10x** față de implementările clasice pe CPU, prin exploatarea paralelismului masiv al GPU-ului și a optimizărilor avansate de memorie.
 
@@ -196,7 +196,7 @@ nvcc -std=c++17 -o ntt_bigint \
 
 ## 📈 Rezultate Așteptate
 
-Evaluarea performanței a fost realizată utilizând o arhitectură **NVIDIA Tesla T4 GPU** (mediul Google Colab). Obiectivul a fost demonstrarea superiorității calculului paralel ($O(N \log N)$) față de abordarea secvențială clasică ($O(N^2)$).
+Evaluarea performanței a fost realizată utilizând o arhitectură **NVIDIA Tesla T4 GPU** (mediul Google Colab). Obiectivul a fost demonstrarea superiorității calculului paralel ( $O(N \log N)$ ) față de abordarea secvențială clasică ( $O(N^2)$ ).
 
 ### Scalabilitate (Runtime Analysis)
 
