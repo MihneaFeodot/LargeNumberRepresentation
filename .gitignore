@@ -10,9 +10,4 @@ ntt_test
 *.obj
 
 # VS Code settings (optional, de obicei nu se urca)
-<<<<<<< HEAD
 .vscode/
-
-=======
-.vscode/
-
