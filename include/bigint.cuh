@@ -1,4 +1,3 @@
-// bigint.cuh
 #ifndef BIGINT_CUH
 #define BIGINT_CUH
 

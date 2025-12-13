@@ -1,9 +1,5 @@
 #include "bigint.cuh"
 
-// =========================================================
-// COD ORIGINAL (De la colegul tau)
-// =========================================================
-
 __device__ inline void add_with_carry(limb_t a, limb_t b, limb_t carry_in,
                                       limb_t* sum, limb_t* carry_out) {
     double_limb_t temp = (double_limb_t)a + (double_limb_t)b + (double_limb_t)carry_in;
@@ -42,12 +38,6 @@ __global__ void sequential_subtract_kernel(const limb_t* a, const limb_t* b,
     }
 }
 
-// =========================================================
-// FIX PENTRU LINKER (Adăugat pentru compatibilitate)
-// =========================================================
-// Acestea sunt funcțiile pe care bigint_operations.cu încearcă să le apeleze.
-// Le definim aici ca să rezolvăm eroarea "undefined reference".
-
 __global__ void parallel_add_kernel(limb_t* a, limb_t* b, limb_t* res, uint8_t* carries, size_t n) {
     int idx = threadIdx.x + blockIdx.x * blockDim.x;
     if (idx < n) {
@@ -58,7 +48,6 @@ __global__ void parallel_add_kernel(limb_t* a, limb_t* b, limb_t* res, uint8_t* 
 }
 
 __global__ void carry_propagation_kernel(limb_t* res, uint8_t* carries, size_t n) {
-    // Placeholder pentru a satisface linker-ul
 }
 
 __global__ void parallel_subtract_kernel(limb_t* a, limb_t* b, limb_t* res, uint8_t* borrows, size_t n) {
@@ -71,5 +60,4 @@ __global__ void parallel_subtract_kernel(limb_t* a, limb_t* b, limb_t* res, uint
 }
 
 __global__ void borrow_propagation_kernel(limb_t* res, uint8_t* borrows, size_t n) {
-    // Placeholder pentru a satisface linker-ul
 }

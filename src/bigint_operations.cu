@@ -1,18 +1,10 @@
 #include "bigint.cuh"
 #include <algorithm>
 
-// =========================================================
-// FIX: FORWARD DECLARATIONS (Spunem compilatorului că există)
-// =========================================================
 __global__ void parallel_add_kernel(limb_t* a, limb_t* b, limb_t* res, uint8_t* carries, size_t n);
 __global__ void carry_propagation_kernel(limb_t* res, uint8_t* carries, size_t n);
-
 __global__ void parallel_subtract_kernel(limb_t* a, limb_t* b, limb_t* res, uint8_t* borrows, size_t n);
 __global__ void borrow_propagation_kernel(limb_t* res, uint8_t* borrows, size_t n);
-
-// =========================================================
-// IMPLEMENTAREA FUNCȚIILOR HOST
-// =========================================================
 
 BigInt* BigIntCUDA::add(const BigInt* a, const BigInt* b) {
     size_t max_limbs = std::max(a->num_limbs, b->num_limbs);
@@ -39,7 +31,6 @@ BigInt* BigIntCUDA::add(const BigInt* a, const BigInt* b) {
     
     int num_blocks = (max_limbs + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     
-    // Acum compilatorul stie ce e 'parallel_add_kernel' datorita declaratiei de sus
     parallel_add_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(d_a->limbs, d_b->limbs, d_result->limbs, d_carries, max_limbs);
     carry_propagation_kernel<<<num_blocks, THREADS_PER_BLOCK>>>(d_result->limbs, d_carries, result_limbs);
     
