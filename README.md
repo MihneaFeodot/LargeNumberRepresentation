@@ -136,15 +136,75 @@ Această tehnică este esențială în etapele **butterfly** ale NTT.
 
 ## 🔄 Transformata Numerică Teoretică (NTT)
 
-Implementarea urmează algoritmul **Cooley–Tukey**:
+### 🛠️ Detalii Tehnice: Implementarea NTT pe GPU
 
-1. **Bit-Reversal Permutation** – reordonarea inițială a elementelor
-2. **Etape Butterfly** – calcul paralel folosind Montgomery multiplication
+Nucleul performanței acestui proiect constă în implementarea manuală a algoritmului NTT, optimizată pentru arhitectura masiv paralelă a CUDA. Pipeline-ul de execuție este compus din trei etape distincte:
 
-Fiecare etapă este lansată ca un kernel CUDA, utilizând Shared Memory cu padding.
+### 1\. Permutarea Bit-Reverse (Reordonarea Datelor)
 
----
+Algoritmul iterativ Cooley-Tukey (Decimation-in-Time) necesită ca datele de intrare să fie amestecate într-o ordine specifică. Indexul $i$ este înlocuit cu indexul obținut prin citirea biților lui $i$ în ordine inversă (ex: `001` devine `100`).
 
+  * **Implementare:** Un kernel dedicat `bit_reverse_kernel` procesează elementele în paralel.
+  * **Logică:** Folosim operații pe biți (`<<`, `>>`, `&`) pentru a calcula noua poziție fără overhead de memorie.
+  * **Optimizare:** Swap-ul se face doar dacă `reversed > tid` pentru a evita dubla interschimbare și race conditions.
+
+<!-- end list -->
+
+```cpp
+for (int i = 0; i < log_n; i++) {
+    reversed = (reversed << 1) | (temp & 1);
+    temp >>= 1;
+}
+```
+
+### 2\. Kernel-ul Butterfly & Managementul Memoriei (Shared Memory)
+
+Aceasta este inima algoritmului. În loc să accesăm memoria globală (VRAM) care este lentă pentru fiecare operație, încărcăm datele în **Shared Memory** (L1 Cache controlat manual), care este de \~100x mai rapidă.
+
+#### 🚀 Optimizare Critică: Evitarea Bank Conflicts
+
+În arhitectura CUDA, Shared Memory este împărțită în 32 de "bănci". Dacă mai multe thread-uri dintr-un warp accesează adrese diferite care cad în aceeași bancă, accesul este serializat (încetinit masiv).
+Pentru a preveni acest lucru, am implementat un mecanism de **Padding**:
+
+```cpp
+#define PADDED_INDEX(i) ((i) + ((i) >> 5))
+```
+
+Acest macro introduce un element gol la fiecare 32 de elemente, "decalând" indecșii astfel încât thread-urile să acceseze bănci diferite simultan.
+
+#### Fluxul de Execuție (ntt\_stage\_kernel):
+
+1.  **Load:** Thread-urile copiază datele din Global Memory în Shared Memory (aplicând padding-ul).
+2.  **Compute:** Se execută operațiile "Butterfly":
+      * $U = A[j]$
+      * $V = A[k] \cdot W$ (unde $W$ este twiddle factor)
+      * $A[j] = U + V \pmod P$
+      * $A[k] = U - V \pmod P$
+3.  **Store:** Rezultatele sunt scrise înapoi în Global Memory.
+
+### 3\. Aritmetică Modulară High-Performance (Montgomery)
+
+Operația `%` (modulo) este extrem de costisitoare pe GPU. Am înlocuit-o cu **Înmulțirea Montgomery**, care transformă diviziunea în operații de înmulțire și shiftare pe biți.
+
+#### Gestionarea Overflow-ului cu `__int128`
+
+Înmulțirea a două numere de 64 de biți poate rezulta într-un număr de 128 de biți. Deoarece C++ standard pe GPU nu gestionează nativ overflow-ul aritmetic complex, am utilizat tipul `unsigned __int128` (suportat de compilatorul NVCC) pentru a păstra precizia completă înainte de reducerea modulară.
+
+```cpp
+__host__ __device__ __forceinline__ field_t montgomery_mul(field_t a, field_t b) {
+    uint64_t product = (uint64_t)a * b;
+    // ... calcul m ...
+    
+    // Calcul exact pe 128 biți pentru a evita overflow
+    unsigned __int128 t_full = (unsigned __int128)product + (unsigned __int128)m * P_MOCK;
+    
+    // Reducere rapidă prin bit-shift
+    uint64_t t = (uint64_t)(t_full >> 32); 
+    
+    if (t >= P_MOCK) return (field_t)(t - P_MOCK);
+    return (field_t)t;
+}
+```
 ## ✅ Verificare și Corectitudine
 
 
