@@ -136,7 +136,7 @@ Această tehnică este esențială în etapele **butterfly** ale NTT.
 
 ## 🔄 Transformata Numerică Teoretică (NTT)
 
-## 📐 Abordarea Matematică: De la Numere la Polinoame
+### 📐 Abordarea Matematică: De la Numere la Polinoame
 
 Pentru a transforma înmulțirea numerelor mari dintr-o operație lentă ($O(N^2)$) într-una eficientă, proiectul se bazează pe echivalența dintre numere și polinoame:
 
