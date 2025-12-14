@@ -136,6 +136,21 @@ Această tehnică este esențială în etapele **butterfly** ale NTT.
 
 ## 🔄 Transformata Numerică Teoretică (NTT)
 
+## 📐 Abordarea Matematică: De la Numere la Polinoame
+
+Pentru a transforma înmulțirea numerelor mari dintr-o operație lentă ($O(N^2)$) într-una eficientă, proiectul se bazează pe echivalența dintre numere și polinoame:
+
+1.  **Modelare Polinomială:**
+    Vectorul de limb-uri `A` este tratat ca un polinom $P(x)$, unde coeficienții sunt valorile limb-urilor, iar variabila $x$ este baza $2^{32}$.
+    $$A = [a_0, a_1, \dots] \xrightarrow{} A(x) = a_0 + a_1 x + a_2 x^2 + \dots$$
+
+2.  **Teorema Convoluției:**
+    Algoritmul exploatează proprietatea conform căreia **convoluția în domeniul timpului** (înmulțirea polinoamelor) devine **înmulțire punct-cu-punct** în domeniul frecvenței.
+    * Flux date: `Input` $\rightarrow$ **NTT** $\rightarrow$ `Înmulțire (Hadamard product)` $\rightarrow$ **Inverse NTT** $\rightarrow$ `Output`.
+
+3.  **Reconstrucția Finală:**
+    Spre deosebire de adunare, rezultatul Inverse NTT generează coeficienți care pot depăși cu mult capacitatea unui limb. Un pas final de normalizare parcurge vectorul rezultat pentru a propaga surplusul (carry) și a restaura formatul canonic BigInt.
+
 ### 🛠️ Detalii Tehnice: Implementarea NTT pe GPU
 
 Nucleul performanței acestui proiect constă în implementarea manuală a algoritmului NTT, optimizată pentru arhitectura masiv paralelă a CUDA. Pipeline-ul de execuție este compus din trei etape distincte:
