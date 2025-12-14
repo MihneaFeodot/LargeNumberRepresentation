@@ -55,6 +55,40 @@ Propagarea carry/borrow este realizată în **doi pași**, folosind o abordare d
 2. **Propagare globală** – carry-urile sunt propagate într-un kernel separat
 
 Această strategie elimină dependențele secvențiale și permite scalarea pe GPU.
+### Implementare CUDA – Adunare / Scădere Paralelă
+
+Operațiile **+ / −** sunt implementate pe GPU folosind două kernel-uri separate: unul pentru calculul local pe limb-uri și unul pentru propagarea carry/borrow.
+
+```cpp
+__global__ void parallel_add_kernel(limb_t* a, limb_t* b, limb_t* res,
+                                    uint8_t* carries, size_t n);
+__global__ void carry_propagation_kernel(limb_t* res,
+                                         uint8_t* carries, size_t n);
+
+__global__ void parallel_subtract_kernel(limb_t* a, limb_t* b, limb_t* res,
+                                         uint8_t* borrows, size_t n);
+__global__ void borrow_propagation_kernel(limb_t* res,
+                                          uint8_t* borrows, size_t n);
+```
+
+Fluxul este următorul:
+
+* **Kernel 1**: fiecare thread operează pe un limb (`res[i] = a[i] ± b[i]`) și produce un carry/borrow local
+* **Kernel 2**: carry/borrow-urile sunt propagate global, eliminând dependențele secvențiale
+
+Lansarea kernel-urilor este realizată astfel:
+
+```cpp
+int blocks = (max_limbs + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+
+parallel_add_kernel<<<blocks, THREADS_PER_BLOCK>>>(
+    d_a->limbs, d_b->limbs, d_result->limbs, d_carries, max_limbs);
+
+carry_propagation_kernel<<<blocks, THREADS_PER_BLOCK>>>(
+    d_result->limbs, d_carries, result_limbs);
+```
+
+Aceeași structură este utilizată și pentru scădere, cu mecanism de **borrow propagation**.
 
 ---
 
