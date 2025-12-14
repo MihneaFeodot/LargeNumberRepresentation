@@ -182,29 +182,6 @@ Acest macro introduce un element gol la fiecare 32 de elemente, "decalând" inde
       * $A[k] = U - V \pmod P$
 3.  **Store:** Rezultatele sunt scrise înapoi în Global Memory.
 
-### 3\. Aritmetică Modulară High-Performance (Montgomery)
-
-Operația `%` (modulo) este extrem de costisitoare pe GPU. Am înlocuit-o cu **Înmulțirea Montgomery**, care transformă diviziunea în operații de înmulțire și shiftare pe biți.
-
-#### Gestionarea Overflow-ului cu `__int128`
-
-Înmulțirea a două numere de 64 de biți poate rezulta într-un număr de 128 de biți. Deoarece C++ standard pe GPU nu gestionează nativ overflow-ul aritmetic complex, am utilizat tipul `unsigned __int128` (suportat de compilatorul NVCC) pentru a păstra precizia completă înainte de reducerea modulară.
-
-```cpp
-__host__ __device__ __forceinline__ field_t montgomery_mul(field_t a, field_t b) {
-    uint64_t product = (uint64_t)a * b;
-    // ... calcul m ...
-    
-    // Calcul exact pe 128 biți pentru a evita overflow
-    unsigned __int128 t_full = (unsigned __int128)product + (unsigned __int128)m * P_MOCK;
-    
-    // Reducere rapidă prin bit-shift
-    uint64_t t = (uint64_t)(t_full >> 32); 
-    
-    if (t >= P_MOCK) return (field_t)(t - P_MOCK);
-    return (field_t)t;
-}
-```
 ## ✅ Verificare și Corectitudine
 
 
