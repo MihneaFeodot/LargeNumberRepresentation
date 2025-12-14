@@ -138,7 +138,7 @@ Această tehnică este esențială în etapele **butterfly** ale NTT.
 
 ### 📐 Abordarea Matematică: De la Numere la Polinoame
 
-Pentru a transforma înmulțirea numerelor mari dintr-o operație lentă ($O(N^2)$) într-una eficientă, proiectul se bazează pe echivalența dintre numere și polinoame:
+Pentru a transforma înmulțirea numerelor mari dintr-o operație lentă $O(N^2)$ într-una eficientă, proiectul se bazează pe echivalența dintre numere și polinoame:
 
 1.  **Modelare Polinomială:**
     Vectorul de limb-uri `A` este tratat ca un polinom $P(x)$, unde coeficienții sunt valorile limb-urilor, iar variabila $x$ este baza $2^{32}$.
