@@ -2,12 +2,8 @@
 #include <cuda_runtime.h>
 #include "montgomery.h"
 
-// ==========================================
-// KERNEL 1: BIT REVERSAL PERMUTATION
-// ==========================================
-// Acest kernel amesteca vectorul initial.
-// Transforma indexul 001 (1) in 100 (4), etc.
-
+// Kernel 1: Bit reversal permutation  -> amesteca vectorul initial
+//                                     -> transforma indexul 001 (1) in 100 (4) etc
 __global__ void bit_reverse_kernel(field_t* d_data, int n, int log_n) {
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     
@@ -15,7 +11,6 @@ __global__ void bit_reverse_kernel(field_t* d_data, int n, int log_n) {
         unsigned int reversed = 0;
         unsigned int temp = tid;
         
-        // Algoritmul de inversare a biților
         for (int i = 0; i < log_n; i++) {
             reversed = (reversed << 1) | (temp & 1);
             temp >>= 1;
@@ -30,23 +25,20 @@ __global__ void bit_reverse_kernel(field_t* d_data, int n, int log_n) {
     }
 }
 
-// ==========================================
-// KERNEL 2: NTT BUTTERFLY STAGE (OPTIMIZED)
-// ==========================================
-
+// Kernel 2: NTT butterfly stage 
 __global__ void ntt_stage_kernel(field_t* global_data, const field_t* twiddles, int m, int n) {
     extern __shared__ field_t s_data[];
 
     int tid = threadIdx.x;
 
-    // --- FAZA A: Incarcare din Global in Shared (Cu Padding) ---
+    // Incarcare din global in shared
     for (int i = tid; i < n; i += blockDim.x) {
         s_data[PADDED_INDEX(i)] = global_data[i];
     }
 
     __syncthreads(); 
 
-    // --- FAZA B: Calculul Butterfly ---
+    // Calculul butterfly
     int half_m = m / 2;
     int total_pairs = n / 2;
 
@@ -69,7 +61,7 @@ __global__ void ntt_stage_kernel(field_t* global_data, const field_t* twiddles, 
 
     __syncthreads(); 
 
-    // --- FAZA C: Salvare din Shared in Global ---
+    // Salvare din shared in global
     for (int i = tid; i < n; i += blockDim.x) {
         global_data[i] = s_data[PADDED_INDEX(i)];
     }

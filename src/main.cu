@@ -1,6 +1,6 @@
 #include <iostream>
 #include <vector>
-#include <chrono> // Pentru cronometrare CPU
+#include <chrono> 
 #include "bigint.cuh" 
 #include "ntt_kernel.cuh"
 #include "verification.h"
@@ -14,11 +14,9 @@
 }
 
 int main() {
-    // === CONFIGURARE TEST ===
-    // Pentru testul de speedup, 4096 e ideal. 8192 ar putea dura mult pe CPU.
+    // Testele au fost realizate cu num_limbs = 1024, 4096 si 8192
     size_t num_limbs = 8192; 
     
-    // Calcul automat log_n
     size_t log_n = 0;
     size_t temp = num_limbs;
     while (temp > 1) { temp >>= 1; log_n++; }
@@ -26,13 +24,13 @@ int main() {
     std::cout << "=== SPEEDUP TEST: GPU vs CPU ===\n";
     std::cout << "N=" << num_limbs << " (" << log_n << " stages)\n";
 
-    // --- SETUP MATEMATIC ---
+    // Setup matematic
     uint64_t R = (1ULL << 32) % P_MOCK;
     field_t R2 = ((unsigned __int128)R * R) % P_MOCK;
     field_t g = 5;
     field_t omega = pow_mod(g, (P_MOCK - 1) / num_limbs, P_MOCK);
 
-    // --- PREGĂTIRE DATE ---
+    // Pregatire date
     BigInt* h_num = BigIntCUDA::allocate_host(num_limbs);
     for(size_t i = 0; i < num_limbs; i++) h_num->limbs[i] = montgomery_mul(i, R2);
 
@@ -46,9 +44,7 @@ int main() {
     CHECK(cudaMalloc(&d_twiddles, num_limbs * sizeof(field_t)));
     CHECK(cudaMemcpy(d_twiddles, h_twiddles.data(), num_limbs * sizeof(field_t), cudaMemcpyHostToDevice));
 
-    // ==========================================
-    // 1. MĂSURARE TIMP GPU (Doar Kernel-urile)
-    // ==========================================
+    // Masurare timp pe GPU (doar kernel-urile)
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -58,18 +54,14 @@ int main() {
     int blocks = (num_limbs + threads - 1) / threads;
     size_t shared_mem_size = (num_limbs + (num_limbs >> 5)) * sizeof(field_t);
 
-    // Pornim cronometrul GPU
     cudaEventRecord(start);
 
-    // A. Bit Reversal
     bit_reverse_kernel<<<blocks, threads>>>(raw_ptr, num_limbs, log_n);
     
-    // B. Butterfly Stages
     for (int m = 2; m <= num_limbs; m *= 2) {
         ntt_stage_kernel<<<1, threads, shared_mem_size>>>(raw_ptr, d_twiddles, m, num_limbs);
     }
 
-    // Oprim cronometrul GPU
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     
@@ -77,23 +69,19 @@ int main() {
     cudaEventElapsedTime(&milliseconds, start, stop);
     float gpu_time_sec = milliseconds / 1000.0f;
 
-    std::cout << "\n[GPU] Timp Executie Kernel: " << gpu_time_sec << " secunde\n";
+    std::cout << "\n[GPU] Timp executie: " << gpu_time_sec << " secunde\n";
 
-    // Recuperăm datele pentru verificare
+    // Recuperare date pentru verificare
     BigIntCUDA::copy_to_host(h_num, d_num);
 
-    // ==========================================
-    // 2. MĂSURARE TIMP CPU (Naive Reference)
-    // ==========================================
+    // Masurare timp pe CPU
     std::cout << "[CPU] Rulare Reference NTT (Asteapta, e lent...)... \n";
     
-    // Pregătim datele pentru CPU (Input normal 0, 1, 2...)
     std::vector<uint32_t> input_data(num_limbs);
     for(size_t i=0; i<num_limbs; i++) input_data[i] = i; 
 
     Verifier v(128);
 
-    // Pornim cronometrul CPU
     auto cpu_start = std::chrono::high_resolution_clock::now();
     
     std::vector<uint32_t> cpu_reference = v.compute_reference_ntt_naive(input_data, omega, P_MOCK);
@@ -102,11 +90,9 @@ int main() {
     std::chrono::duration<double> cpu_diff = cpu_stop - cpu_start;
     double cpu_time_sec = cpu_diff.count();
 
-    std::cout << "[CPU] Timp Executie: " << cpu_time_sec << " secunde\n";
+    std::cout << "[CPU] Timp executie: " << cpu_time_sec << " secunde\n";
 
-    // ==========================================
-    // 3. CALCUL SPEEDUP
-    // ==========================================
+    // Calculare speedup
     double speedup = cpu_time_sec / gpu_time_sec;
     
     std::cout << "\n============================================\n";
@@ -116,7 +102,7 @@ int main() {
     std::cout << ">>> SPEEDUP: " << speedup << "x <<<\n";
     std::cout << "============================================\n";
 
-    // Verificare Scurta (ca sa fim siguri ca e corect)
+    // Verificare corectitudine
     if (montgomery_mul(h_num->limbs[0], 1) == cpu_reference[0]) {
         std::cout << "[Check] Rezultatele par consistente (Index 0 Match).\n";
     } else {
