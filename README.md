@@ -197,7 +197,7 @@ Acest macro introduce un element gol la fiecare 32 de elemente, "decalând" inde
       * $A[k] = U - V \pmod P$
 3.  **Store:** Rezultatele sunt scrise înapoi în Global Memory.
 
-## ✅ Verificare și Corectitudine
+## ✅ Verificare și Corectitudine 
 
 
 Pentru a valida rezultatele complexe obținute pe GPU (unde rulăm un algoritm Cooley-Tukey optimizat cu complexitate $O(N \log N)$, am implementat un **model de referință** pe CPU.
