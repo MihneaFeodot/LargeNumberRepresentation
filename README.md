@@ -25,7 +25,7 @@ Scopul este demonstrarea unui **speedup de 5x–10x** față de implementările 
 | ------------ | ----------------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
 | **Membru 1** | Infrastructure & BigInt | `bigint.cuh`, `bigint_impl.cu`, `bigint_utils.cpp` | Structura BigInt, management memorie CUDA, adunare/scădere paralelă |
 | **Membru 2** | Algoritm NTT            | `ntt_kernel.cuh`, `montgomery.h`                   | Bit-reversal, butterfly kernels, Cooley–Tukey                       |
-| **Membru 3** | Optimizare & Verificare | `montgomery.h`, `verification.cpp`                 | Montgomery multiplication, optimizare memorie, validare MPFR        |
+| **Membru 3** | Optimizare & Verificare | `montgomery.h`, `verification.cpp`, `main.cu`      | Montgomery multiplication, optimizare memorie, validare MPFR        |
 
 ---
 
